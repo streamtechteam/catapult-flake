@@ -1,0 +1,56 @@
+name: Update Catapult
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Find latest upstream release
+        id: latest
+        run: |
+          # Follow the /releases/latest redirect (avoids API rate limits)
+          tag=$(curl -sSIL -o /dev/null -w '%{url_effective}' \
+            https://github.com/qrrk/Catapult/releases/latest | sed 's|.*/||')
+          current=$(sed -nE 's/^\s*version = "([^"]+)";.*/\1/p' flake.nix | head -n1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "Upstream: $tag, flake: $current"
+
+      - name: Update flake.nix
+        if: steps.latest.outputs.tag != steps.latest.outputs.current
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          url="https://github.com/qrrk/Catapult/releases/download/${TAG}/catapult-linux-x64-${TAG}"
+          hash=$(nix store prefetch-file --json "$url" | jq -r .hash)
+          sed -i -E "s|^(\s*version = \")[^\"]*(\";)|\1${TAG}\2|" flake.nix
+          sed -i -E "s|^(\s*hash = \")[^\"]*(\";)|\1${hash}\2|" flake.nix
+          git diff flake.nix
+
+      - name: Verify it still builds
+        if: steps.latest.outputs.tag != steps.latest.outputs.current
+        run: nix build .#unwrapped --no-link
+
+      - name: Commit and push
+        if: steps.latest.outputs.tag != steps.latest.outputs.current
+        env:
+          TAG: ${{ steps.latest.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "catapult: update to ${TAG}"
+          git push
