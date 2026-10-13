@@ -92,7 +92,7 @@
         # It resolves correctly via PATH once the package is installed.
         exec = "catapult";
         icon = "catapult";
-        categories = ["Game" "RolePlaying" "Launcher"];
+        categories = ["Game"];
         comment = "Cross-platform launcher for Cataclysm: DDA and BN";
       };
 
