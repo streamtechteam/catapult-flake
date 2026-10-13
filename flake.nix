@@ -23,7 +23,6 @@
         };
 
         dontUnpack = true;
-        # Don't touch the ELF: it has an embedded PCK that stripping/patching could corrupt.
         dontStrip = true;
         dontPatchELF = true;
         dontFixup = true;
@@ -33,8 +32,6 @@
         '';
       };
 
-      # Catapult needs write access to the folder containing its executable,
-      # so copy it to a writable data dir and run it from there.
       launcher = pkgs.writeShellApplication {
         name = "catapult-launch";
         runtimeInputs = [ pkgs.coreutils pkgs.diffutils ];
@@ -50,17 +47,13 @@
         '';
       };
 
-      # FHS env: the launcher is a generic Linux binary (expects /lib64/ld-linux),
-      # and so are the game builds it downloads (they need SDL2 etc.).
       catapult = pkgs.buildFHSEnv {
         name = "catapult";
         targetPkgs = p: with p; [
-          # Godot runtime libs (dlopen'd)
           libGL
           libx11 libxcursor libxinerama libxrandr libxi libxext libxrender libxfixes
           libxkbcommon wayland
           alsa-lib libpulseaudio udev dbus fontconfig
-          # Game builds (from the README's dependency list)
           SDL2 SDL2_image SDL2_ttf SDL2_mixer freetype
           zip unzip zlib ncurses
           stdenv.cc.cc.lib
@@ -74,16 +67,52 @@
           platforms = [ system ];
         };
       };
+
+      # ==========================================
+      # Menu Integration
+      # ==========================================
+
+      # 1. Fetch the official icon from the upstream repository
+      iconPng = pkgs.fetchurl {
+        url = "https://raw.githubusercontent.com/qrrk/Catapult/master/icons/appicon.png";
+        hash = "sha256-gfisg62i7f46y7g53xzgxzn3d2jvkk2jf99w480dhkdz75rzdjy1";
+      };
+
+      # 2. Place the icon in the standard Freedesktop icon directory structure
+      iconDir = pkgs.runCommand "catapult-icon" {} ''
+        mkdir -p $out/share/icons/hicolor/256x256/apps
+        cp ${iconPng} $out/share/icons/hicolor/256x256/apps/catapult.png
+      '';
+
+      # 3. Create the .desktop file
+      desktopItem = pkgs.makeDesktopItem {
+        name = "catapult";
+        desktopName = "Catapult";
+        # Using just "catapult" is the standard NixOS approach. 
+        # It resolves correctly via PATH once the package is installed.
+        exec = "catapult";
+        icon = "catapult";
+        categories = ["Game" "RolePlaying" "Launcher"];
+        comment = "Cross-platform launcher for Cataclysm: DDA and BN";
+      };
+
+      # 4. Combine the FHS environment, desktop item, and icon into a single package
+      catapultWithDesktop = pkgs.symlinkJoin {
+        name = "catapult";
+        paths = [ catapult desktopItem iconDir ];
+        meta = catapult.meta;
+      };
+
     in
     {
       packages.${system} = {
-        default = catapult;
+        default = catapultWithDesktop;
         inherit catapult unwrapped;
       };
 
       apps.${system}.default = {
         type = "app";
-        program = lib.getExe catapult;
+        program = lib.getExe catapultWithDesktop;
       };
     };
 }
