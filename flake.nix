@@ -5,7 +5,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      system = stdenv.hostPlatform.system;
+      system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       inherit (pkgs) lib;
 
