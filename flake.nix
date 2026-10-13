@@ -75,7 +75,7 @@
       # 1. Fetch the official icon from the upstream repository
       iconPng = pkgs.fetchurl {
         url = "https://raw.githubusercontent.com/qrrk/Catapult/master/icons/appicon.png";
-        hash = "1ks5zn68iiqiwg7jp8zzsyziskf87nkr0bi59q86hw5ngx5gwkgs";
+        sha256 = "1ks5zn68iiqiwg7jp8zzsyziskf87nkr0bi59q86hw5ngx5gwkgs";
       };
 
       # 2. Place the icon in the standard Freedesktop icon directory structure
