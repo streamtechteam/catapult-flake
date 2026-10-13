@@ -37,17 +37,14 @@
       # so copy it to a writable data dir and run it from there.
       launcher = pkgs.writeShellApplication {
         name = "catapult-launch";
-        runtimeInputs = [ pkgs.coreutils ]; # diffutils no longer needed
+        runtimeInputs = [ pkgs.coreutils pkgs.diffutils ];
         text = ''
           data="''${XDG_DATA_HOME:-$HOME/.local/share}/catapult"
           mkdir -p "$data"
-          
-          # Force-create/update the symlink to the current Nix store binary.
-          # This ensures the executable "lives" in a writable folder, 
-          # allowing the app to write configs/sidecar files next to it, 
-          # while avoiding redundant disk writes and saving space.
-          ln -sf ${unwrapped}/bin/catapult "$data/catapult"
-          
+          if ! cmp -s ${unwrapped}/bin/catapult "$data/catapult"; then
+            install -m755 ${unwrapped}/bin/catapult "$data/catapult.tmp"
+            mv -f "$data/catapult.tmp" "$data/catapult"
+          fi
           cd "$data"
           exec ./catapult "$@"
         '';
